@@ -1,0 +1,42 @@
+# 📊 Suivi des Abonnements
+**Dernière mise à jour :** 26 septembre 2026
+
+## Abonnements
+
+| Service                  | Catégorie     | Montant | Devise | Fréquence   | Coût mensuel équivalent | Coût annuel | Date de début | Prochain renouvellement | Moyen de paiement | Statut   | Préavis de résiliation (jours) | Jours restants | Notes                     |
+|--------------------------|---------------|---------|--------|-------------|--------------------------|-------------|---------------|--------------------------|-------------------|----------|--------------------------------|----------------|---------------------------|
+| Netflix                  | Streaming     | 5800    | FCFA   | Mensuel     |                          |             | 2026-08-15    |                         | Carte bancaire    | Actif    | 0                             |                | Forfait Standard          |
+| Spotify Premium          | Musique       | 1500    | FCFA   | Mensuel     |                          |             | 2026-09-01    |                         | MTN MoMo          | Actif    | 0                             |                |                           |
+| Microsoft 365            | Productivité  | 25000   | FCFA   | Annuel      |                          |             | 2026-03-10    |                         | Carte bancaire    | Actif    | 30                            |                | Licence famille           |
+| Canva Pro                | Design        | 10800   | FCFA   | Annuel      |                          |             | 2025-10-01    |                         | Moov MoMo        | Actif    | 15                            |                | Renouvellement proche    |
+| YouTube Premium          | Streaming     | 3200    | FCFA   | Mensuel     |                          |             | 2026-07-05    |                         | MTN MoMo          | Actif    | 0                             |                |                           |
+| Google One 200 Go        | Stockage      | 2400    | FCFA   | Annuel      |                          |             | 2025-09-30    |                         | Carte bancaire    | Actif    | 7                             |                |                           |
+| Presse en ligne          | Actualités    | 1000    | FCFA   | Hebdomadaire|                          |             | 2026-09-07    |                         | MTN MoMo          | Actif    | 0                             |                | Facturé chaque semaine    |
+| Orange Fibre             | Télécom       | 12000   | FCFA   | Mensuel     |                          |             | 2026-01-12    |                         | Prélèvement       | Actif    | 10                            |                | Box internet + mobile     |
+| Figma Professionnel      | Design        | 13000   | FCFA   | Mensuel     |                          |             | 2026-09-20    |                         | Carte bancaire    | Essai    | 0                             |                | Essai gratuit 30 jours    |
+| Nom de domaine .com      | Hébergement web | 7500  | FCFA   | Annuel      |                          |             | 2026-11-02    |                         | Moov MoMo        | Suspendu | 30                            |                | À réactiver avant échéance |
+
+## Synthèse
+
+| Indicateur                          | Valeur                          |
+|-------------------------------------|---------------------------------|
+| Nombre d'abonnements                |                                 |
+| Abonnements actifs                  |                                 |
+| Coût mensuel total (équivalent)     |                                 |
+| Coût annuel total (équivalent)      |                                 |
+| Prochain renouvellement             |                                 |
+
+### Répartition par catégorie
+
+| Catégorie        | Coût mensuel | Coût annuel | Détail (formule SUMIF sur la feuille Abonnements) |
+|------------------|--------------|-------------|----------------------------------------------------|
+| Streaming        |              |             |                                                    |
+| Musique          |              |             |                                                    |
+| Productivité     |              |             |                                                    |
+| Télécom          |              |             |                                                    |
+| Stockage         |              |             |                                                    |
+| Design           |              |             |                                                    |
+| Hébergement web  |              |             |                                                    |
+| Actualités       |              |             |                                                    |
+| Autre            |              |             |                                                    |
+| TOTAL            |              |             |                                                    |
