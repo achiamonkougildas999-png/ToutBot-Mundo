@@ -1,0 +1,41 @@
+# =============================================================================
+# ToutBot Mundo — dépendances déterministes (déploiement production)
+# Installation :  pip install -r requirements.txt
+# =============================================================================
+
+# --- Coeur application -------------------------------------------------------
+Flask==3.0.3
+Werkzeug==3.0.6
+Jinja2==3.1.4
+itsdangerous==2.2.0
+click==8.1.7
+blinker==1.8.2
+
+# --- V13 : assistant web intégré (transport HTTP des collecteurs + IA) -------
+# Sans « requests », le bloc V13 retombe sur urllib (transport codé en repli) :
+# l'installation est donc facultative mais recommandée.
+requests==2.32.3
+
+# --- Serveur d'application (remplace app.run / serveur de développement) -----
+gunicorn==23.0.0
+waitress==3.0.2
+
+# --- Limitation de débit / cache partagé ------------------------------------
+Flask-Limiter==3.8.0
+limits==3.13.0
+redis==5.0.8
+
+# --- Base de données de production (PostgreSQL) ------------------------------
+psycopg[binary]==3.2.3
+
+# --- Extensions optionnelles déclarées (repli codé si absentes) --------------
+flask-sock==0.7.0
+pywebpush==2.0.0
+py-vapid==1.9.1
+openpyxl==3.1.5
+
+# --- Configuration / secrets -------------------------------------------------
+python-dotenv==1.0.1
+
+# --- Observabilité (optionnel) ----------------------------------------------
+sentry-sdk[flask]==2.19.2
