@@ -1,0 +1,72 @@
+# =============================================================================
+# ToutBot Mundo — pile de production complète
+#   web (Gunicorn) + db (PostgreSQL) + cache (Redis) + nginx (TLS/HTTPS)
+# Démarrage :  cp .env.example .env && docker compose up -d --build
+# =============================================================================
+version: "3.9"
+
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8000"
+      DATABASE_URL: postgresql://toutbot:${POSTGRES_PASSWORD:-toutbot}@db:5432/toutbot
+      REDIS_URL: redis://cache:6379/0
+      TOUTBOT_MODE: production
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    volumes:
+      - donnees_app:/data
+    expose: ["8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: toutbot
+      POSTGRES_USER: toutbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-toutbot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U toutbot -d toutbot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on: [web]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  donnees_app:
+  pgdata:
+  redisdata:
