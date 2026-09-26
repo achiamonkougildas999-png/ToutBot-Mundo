@@ -1,0 +1,8 @@
+flask>=3.0
+flask-sock>=0.7
+gunicorn>=22.0
+psycopg2-binary>=2.9
+# Optionnels, chargés seulement si la variable d'environnement correspondante est définie
+# pywebpush>=1.14          # notifications push navigateur (optionnel)
+# playwright>=1.40 && playwright install chromium   # recherche navigateur sans clé API (optionnel)
+# selenium>=4.0            # secours Selenium (optionnel)
