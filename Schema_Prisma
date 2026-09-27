@@ -1,0 +1,200 @@
+-- ============================================================
+-- MIGRATION V202
+-- APPLICATION STRICTE DE LA RÈGLE MÉTIER UNIQUE :
+--
+--   Tous les dépôts/retraits, abonnements et pourboires ne
+--   passent QUE par ces deux numéros administrateur :
+--     MTN  : 2250585167882
+--     MOOV : 2250160428847
+--
+-- Constat : cette règle était dupliquée dans deux tables
+-- différentes (comptes_encaissement_admin_v200 ET
+-- compte_encaissement_admin), avec un troisième numéro ORANGE
+-- inséré dans la seconde. Comme le code applicatif ne peut
+-- interroger qu'UNE table, l'autre devient une porte dérobée
+-- qui ne respecte plus la règle. On supprime cette ambiguïté :
+-- une seule table fait foi, tout le reste s'y réfère par FK.
+-- ============================================================
+
+
+-- ============================================================
+-- 1. SUPPRESSION DE LA TABLE FANTÔME
+-- ------------------------------------------------------------
+-- compte_encaissement_admin (sans _v200) n'est référencée par
+-- aucune FK du schéma Prisma officiel. Elle contient un
+-- troisième numéro (ORANGE, 2250700000000) qui viole la règle
+-- métier. On vérifie qu'aucune donnée réelle n'en dépend avant
+-- de la supprimer.
+-- ============================================================
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = 'compte_encaissement_admin'
+  ) THEN
+
+    -- Sécurité : si une déclaration ou un retrait pointe vers
+    -- cette table via une FK existante, on arrête la migration
+    -- au lieu de supprimer silencieusement des données utiles.
+    IF EXISTS (
+      SELECT 1 FROM information_schema.table_constraints tc
+      JOIN information_schema.constraint_column_usage ccu
+        ON tc.constraint_name = ccu.constraint_name
+      WHERE ccu.table_name = 'compte_encaissement_admin'
+        AND tc.constraint_type = 'FOREIGN KEY'
+    ) THEN
+      RAISE EXCEPTION
+        'Arrêt migration : des FK pointent encore vers compte_encaissement_admin — migrer les données manuellement avant suppression';
+    END IF;
+
+    DROP TABLE "compte_encaissement_admin" CASCADE;
+    RAISE NOTICE 'Table fantôme compte_encaissement_admin supprimée.';
+
+  END IF;
+END $$;
+
+
+-- ============================================================
+-- 2. TABLE DE RÉFÉRENCE UNIQUE : LES DEUX NUMÉROS, VERROUILLÉS
+-- ------------------------------------------------------------
+-- comptes_encaissement_admin_v200 devient l'unique source de
+-- vérité. Une CHECK constraint y verrouille directement les
+-- deux seuls numéros/opérateurs autorisés : impossible d'y
+-- insérer un troisième compte (ORANGE ou autre), même par erreur
+-- applicative.
+-- ============================================================
+
+ALTER TABLE "comptes_encaissement_admin_v200"
+  DROP CONSTRAINT IF EXISTS "compte_admin_seuls_deux_autorises_v202";
+
+ALTER TABLE "comptes_encaissement_admin_v200"
+  ADD CONSTRAINT "compte_admin_seuls_deux_autorises_v202"
+  CHECK (
+    ("operateur" = 'MTN'  AND "numero" = '2250585167882')
+    OR
+    ("operateur" = 'MOOV' AND "numero" = '2250160428847')
+  );
+
+-- Nettoyage : tout compte qui ne serait pas l'un des deux
+-- numéros officiels est désactivé (jamais supprimé, pour
+-- préserver l'historique des transactions déjà liées).
+UPDATE "comptes_encaissement_admin_v200"
+SET "actif" = false
+WHERE "numero" NOT IN ('2250585167882', '2250160428847');
+
+-- Seed idempotent des deux seuls comptes autorisés.
+INSERT INTO "comptes_encaissement_admin_v200"
+  ("id", "operateur", "numero", "libelle", "actif", "cree_le")
+VALUES
+  (gen_random_uuid(), 'MTN',  '2250585167882', 'MTN Mobile Money — Administrateur',  true, NOW()),
+  (gen_random_uuid(), 'MOOV', '2250160428847', 'Moov Mobile Money — Administrateur', true, NOW())
+ON CONFLICT ("numero") DO UPDATE
+  SET "operateur" = EXCLUDED."operateur",
+      "libelle"   = EXCLUDED."libelle",
+      "actif"     = true;
+
+
+-- ============================================================
+-- 3. RETRAIT DES CONTRAINTES DUPLIQUÉES EN DUR
+-- ------------------------------------------------------------
+-- Ces CHECK constraints répétaient les deux numéros en clair
+-- sur chaque table (declarations, retraits, transactions).
+-- Elles deviennent inutiles : chaque table référence déjà
+-- comptes_encaissement_admin_v200 par FK (compte_encaissement_id
+-- / compte_decaissement_id), et cette table est désormais la
+-- seule à pouvoir contenir un numéro admin (étape 2). Les garder
+-- ferait courir le risque exact qui a causé le problème initial :
+-- deux endroits à maintenir en cas de rotation de numéro.
+-- ============================================================
+
+ALTER TABLE "declarations_paiement_v200"
+  DROP CONSTRAINT IF EXISTS "declarations_paiement_v200_numero_admin";
+
+ALTER TABLE "demandes_retrait_v200"
+  DROP CONSTRAINT IF EXISTS "demandes_retrait_v200_numero_admin";
+
+ALTER TABLE "transactions_financieres_v200"
+  DROP CONSTRAINT IF EXISTS "transactions_financieres_v200_operateur_restreint";
+
+ALTER TABLE "transactions_financieres_v200"
+  DROP CONSTRAINT IF EXISTS "transaction_numero_admin_valide";
+
+-- À la place : le numéro sur la transaction doit correspondre
+-- à un compte actif et autorisé, vérifié dynamiquement contre
+-- la table de référence (jamais en dur).
+CREATE OR REPLACE FUNCTION verifier_numero_admin_v202()
+RETURNS TRIGGER
+AS $$
+BEGIN
+  IF NEW."numero_admin_recepteur" IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM "comptes_encaissement_admin_v200"
+    WHERE "numero" = NEW."numero_admin_recepteur"
+      AND "actif" = true
+  ) THEN
+    RAISE EXCEPTION
+      'Numéro administrateur % refusé : seuls les comptes actifs de comptes_encaissement_admin_v200 sont autorisés (MTN 2250585167882 / MOOV 2250160428847)',
+      NEW."numero_admin_recepteur";
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS numero_admin_valide_v201 ON "transactions_financieres_v200";
+DROP TRIGGER IF EXISTS numero_admin_valide_v202 ON "transactions_financieres_v200";
+
+CREATE TRIGGER numero_admin_valide_v202
+BEFORE INSERT OR UPDATE OF "numero_admin_recepteur"
+ON "transactions_financieres_v200"
+FOR EACH ROW
+EXECUTE FUNCTION verifier_numero_admin_v202();
+
+
+-- ============================================================
+-- 4. ConfigV5 : ALIGNÉ SUR LA TABLE DE RÉFÉRENCE, PAS L'INVERSE
+-- ------------------------------------------------------------
+-- config_v5 reste utile pour un accès rapide côté application,
+-- mais est maintenant re-synchronisé depuis la table de
+-- référence plutôt que maintenu indépendamment.
+-- ============================================================
+
+INSERT INTO "config_v5" ("cle", "valeur")
+SELECT 'momo_admin_mtn', "numero"
+FROM "comptes_encaissement_admin_v200"
+WHERE "operateur" = 'MTN' AND "actif" = true
+ON CONFLICT ("cle") DO UPDATE SET "valeur" = EXCLUDED."valeur";
+
+INSERT INTO "config_v5" ("cle", "valeur")
+SELECT 'momo_admin_moov', "numero"
+FROM "comptes_encaissement_admin_v200"
+WHERE "operateur" = 'MOOV' AND "actif" = true
+ON CONFLICT ("cle") DO UPDATE SET "valeur" = EXCLUDED."valeur";
+
+
+-- ============================================================
+-- 5. VÉRIFICATION FINALE
+-- ============================================================
+
+DO $$
+DECLARE
+  v_count integer;
+BEGIN
+  SELECT COUNT(*) INTO v_count
+  FROM "comptes_encaissement_admin_v200"
+  WHERE "actif" = true;
+
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION
+      'Anomalie : % compte(s) admin actif(s) au lieu de 2 attendus (MTN + MOOV)', v_count;
+  END IF;
+END $$;
+
+SELECT "operateur", "numero", "libelle", "actif"
+FROM "comptes_encaissement_admin_v200"
+ORDER BY "operateur";
